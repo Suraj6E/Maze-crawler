@@ -21,6 +21,8 @@ import os
 import webbrowser
 from pathlib import Path
 
+from viewer import write_viewer
+
 # Importing kaggle_environments dumps a wall of OpenSpiel / litellm noise: Python
 # INFO logs PLUS a C extension that writes straight to the OS stderr fd (so a
 # normal Python redirect can't catch it). Silence logging and redirect fd 1/2
@@ -65,10 +67,9 @@ def main():
     else:
         print(f"Outcome: player_{0 if p0['reward'] > p1['reward'] else 1} wins")
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(env.render(mode="html"), encoding="utf-8")
+    out = write_viewer(env, args.out)
     print(f"\nReplay written to {out}")
+    print("Viewer controls: light/dark theme | View All/P1/P2 (per-player fog) | playback")
 
     if args.no_open:
         print("Open it in any browser to watch (or drop --no-open next time).")
