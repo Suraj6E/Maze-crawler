@@ -1,0 +1,9 @@
+# Python virtual environment
+/.venv/
+
+# Match outputs / replays
+/data/
+
+# Python caches
+__pycache__/
+*.pyc
