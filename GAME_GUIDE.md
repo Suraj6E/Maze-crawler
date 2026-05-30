@@ -94,7 +94,7 @@ flowchart TD
     T2 -- "tie" --> DRAW["true draw — both get 0.5"]
 ```
 
-**Reward** (what `run.ps1` prints): alive → your total robot energy; win by
+**Reward** (what `main.py` prints): alive → your total robot energy; win by
 tiebreak → `1`; loss → `0`; draw → `0.5`; eliminated → a negative number (the
 earlier you die, the more negative).
 
