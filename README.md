@@ -11,11 +11,11 @@ write the agent** (the "brain") that, each turn, looks at what it can see and
 decides what every robot should do.
 
 ```
-            ┌─────────────────────────── you edit this ──────────────────────────┐
- main.py ──▶ agents/crawl-agent/main.py : agent(obs, config) ──▶ {robot_uid: "ACTION"}
-    │                                                                      │
-    │   feeds your agent + a 2nd agent into the `crawl` engine            │
-    ▼                                                                      ▼
+            ┌────────────────────────── you edit these ─────────────────────────┐
+ main.py ──▶ agents/<name>/main.py : agent(obs, config) ──▶ {robot_uid: "ACTION"}
+    │                                                                     │
+    │   feeds the two chosen agents into the `crawl` engine              │
+    ▼                                                                     ▼
  kaggle-environments "crawl"  ── simulates the whole match ──▶  data/crawl_replay.html
                                                                   (open in a browser)
 ```
@@ -31,7 +31,9 @@ the bottom. You build robots, gather energy, and try to outlast the opponent. Re
 | Path | What it is |
 | ---- | ---------- |
 | `main.py` | **Run the project.** Plays a match, writes + opens the HTML replay. |
-| `agents/crawl-agent/main.py` | **Your agent — edit this.** The `agent(obs, config)` function. |
+| `agents/` | One folder per strategy. Add your own as `agents/<name>/main.py`. |
+| `agents/baseline/main.py` | Minimal survival agent (head north, jump over walls). |
+| `agents/greedy/main.py` | Survival + a simple economy (builds scouts/miners, grabs crystals). |
 | `viewer.py` | Builds the standalone HTML replay viewer (theme + per-player views). |
 | `GAME_GUIDE.md` | Rules, robot types, scoring, and diagrams. |
 | `data/` | Replay output (`crawl_replay.html`). Git-ignored. |
@@ -55,17 +57,19 @@ Use the virtual environment's Python:
 .\.venv\Scripts\python main.py
 ```
 
-That plays **your agent vs the built-in `random` agent**, prints the result, writes
-`data/crawl_replay.html`, and **opens it in your browser** to watch. The replay is a
-standalone file — no server needed.
+That plays the default matchup (**`greedy` vs the built-in `random`**), prints the
+result, writes `data/crawl_replay.html`, and **opens it in your browser**. The
+replay is a standalone file — no server needed.
 
-Common variations:
+You pick the two agents **by name** (a folder under `agents/`), by path, or
+`random`:
 
 ```powershell
-.\.venv\Scripts\python main.py --seed 7                       # different map
-.\.venv\Scripts\python main.py --p2 agents/crawl-agent/main.py # vs a copy of yourself
-.\.venv\Scripts\python main.py --no-open                      # don't auto-open the browser
-.\.venv\Scripts\python main.py random random                  # two random agents
+.\.venv\Scripts\python main.py greedy baseline       # greedy (P1) vs baseline (P2)
+.\.venv\Scripts\python main.py --p1 baseline --p2 greedy
+.\.venv\Scripts\python main.py greedy random --seed 7 # different map
+.\.venv\Scripts\python main.py --no-open              # don't auto-open the browser
+.\.venv\Scripts\python main.py --list                 # list available agents
 ```
 
 Tip: activate the venv once (`.\.venv\Scripts\Activate.ps1`) and you can just type
@@ -94,8 +98,8 @@ Full scoring is in [GAME_GUIDE.md](GAME_GUIDE.md).
 
 ## Where to change your strategy
 
-Everything lives in **[agents/crawl-agent/main.py](agents/crawl-agent/main.py)** —
-the `agent(obs, config)` function. It runs once per turn and returns a dict mapping
+Each strategy is a folder under `agents/` with a `main.py` that defines an
+`agent(obs, config)` function. It runs once per turn and returns a dict mapping
 each of your robot ids to an action string:
 
 ```python
@@ -114,21 +118,40 @@ def agent(obs, config):
 - Actions are strings like `"NORTH"`, `"BUILD_SCOUT_NORTH"`, `"JUMP_NORTH"`,
   `"TRANSFORM"`, `"IDLE"` — full list in `GAME_GUIDE.md`.
 
-The current agent is a deliberately minimal **survival baseline**: head north, and
-have the factory `JUMP_NORTH` over walls so it doesn't get scrolled off the map.
-It beats `random`, and it's the starting point for a real strategy (economy,
-mining, walls, combat, pathfinding).
+**The two example agents:**
+
+- **`baseline`** — minimal survival: head north; factory `JUMP_NORTH`s over walls
+  so it isn't scrolled off. Beats `random`.
+- **`greedy`** — survival plus a simple economy: the factory builds scouts/miners,
+  scouts chase crystals, miners head for mining nodes. It shows more of the API
+  (reading crystals/nodes, wall-aware building, greedy pathing). It is *not*
+  strictly better than `baseline` — because reward is total energy and the factory
+  is indestructible, hoarding energy in the factory (baseline) competes well with
+  spending it on units that might die (greedy). That tension is the game.
+
+**To add your own strategy:**
+
+```powershell
+mkdir agents\myidea
+copy agents\greedy\main.py agents\myidea\main.py   # start from an example
+# edit agents\myidea\main.py, then:
+.\.venv\Scripts\python main.py myidea baseline
+```
+
+`python main.py --list` shows every agent it can find.
 
 ## Submitting to Kaggle
 
 Maze Crawler is a **Simulations** competition: you submit the *agent*, and Kaggle
 runs the same `crawl` environment on its servers, calling your `agent(obs, config)`
-exactly like `main.py` does locally. Our agent is a single self-contained file
-(`agents/crawl-agent/main.py`, no extra imports), so submitting is simple.
+exactly like `main.py` does locally. Each agent here is a single self-contained
+file (e.g. `agents/greedy/main.py`, no extra imports), so submitting is simple —
+pick whichever agent you want to submit.
 
 **Option A — Kaggle website (easiest):** on the competition's **Submit Agent**
-page, upload `agents/crawl-agent/main.py` (or a `submission.tar.gz` with `main.py`
-at its root). Kaggle validates it, then it plays ranked matches on the leaderboard.
+page, upload your agent's `main.py` (e.g. `agents/greedy/main.py`), or a
+`submission.tar.gz` with `main.py` at its root. Kaggle validates it, then it plays
+ranked matches on the leaderboard.
 
 **Option B — Kaggle API (command line):**
 
@@ -136,8 +159,8 @@ at its root). Kaggle validates it, then it plays ranked matches on the leaderboa
 # one-time: install the CLI and put your token at  ~/.kaggle/kaggle.json
 .\.venv\Scripts\pip install kaggle
 
-# package the agent (main.py must be at the root of the archive)
-tar -czf submission.tar.gz -C agents/crawl-agent main.py
+# package the agent you want to submit (main.py must be at the root of the archive)
+tar -czf submission.tar.gz -C agents/greedy main.py
 
 # submit
 .\.venv\Scripts\kaggle competitions submit -c maze-crawler -f submission.tar.gz -m "baseline"

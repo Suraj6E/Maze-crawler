@@ -117,7 +117,8 @@ Fog of war: you only see within your robots' combined vision. Walls and mines ar
 *remembered*; crystals, enemies, and mining nodes are **not** — they vanish from
 your view once no robot can see them.
 
-The current baseline in [agents/crawl-agent/main.py](agents/crawl-agent/main.py)
-does the minimum to survive: head north, and have the factory `JUMP_NORTH` over
-walls so it doesn't get scrolled off. Everything else (economy, mining, walls,
-combat, pathfinding) is yours to build.
+Two example agents ship in `agents/`: [baseline](agents/baseline/main.py) does the
+minimum to survive (head north; factory `JUMP_NORTH`s over walls), and
+[greedy](agents/greedy/main.py) adds a simple economy (builds scouts/miners,
+chases crystals). Run them with `python main.py greedy baseline`. Everything else
+(reaching mining nodes, walls, combat, real pathfinding) is yours to build.

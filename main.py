@@ -4,20 +4,26 @@ This is the project's entry point — it plays one game between two agents on th
 Kaggle `crawl` environment, writes a self-contained HTML replay, prints the
 result, and (by default) opens the replay in your browser.
 
+Agents are referenced by NAME (a folder under agents/ containing main.py), or by
+an explicit path, or the built-in "random".
+
 Examples
 --------
-    python main.py                          # your agent vs the built-in "random"
-    python main.py --seed 7                  # a different map
-    python main.py --p2 agents/crawl-agent/main.py   # your agent vs a copy of itself
-    python main.py random random --no-open   # two random agents, don't open browser
+    python main.py                       # default matchup (greedy vs random)
+    python main.py greedy baseline        # greedy (P1) vs baseline (P2)
+    python main.py --p1 baseline --p2 greedy
+    python main.py greedy random --seed 7 # different map
+    python main.py --list                 # list available agents
 
-You edit your strategy in  agents/crawl-agent/main.py  (the `agent` function).
+Add your own strategy by creating  agents/<name>/main.py  with an
+`agent(obs, config)` function — then run  python main.py <name> random.
 Game rules / diagrams are in  GAME_GUIDE.md.
 """
 
 import argparse
 import logging
 import os
+import sys
 import webbrowser
 from pathlib import Path
 
@@ -41,31 +47,71 @@ finally:
     os.close(_saved[1])
     os.close(_devnull)
 
-DEFAULT_AGENT = "agents/crawl-agent/main.py"
+AGENTS_DIR = Path("agents")
+DEFAULT_P1 = "greedy"
+DEFAULT_P2 = "random"
+
+
+def available_agents():
+    """Names of agents/<name>/ folders that contain a main.py."""
+    if not AGENTS_DIR.is_dir():
+        return []
+    return sorted(p.name for p in AGENTS_DIR.iterdir() if (p / "main.py").is_file())
+
+
+def resolve_agent(name):
+    """Turn an agent name / path / "random" into something env.run accepts."""
+    if name == "random":
+        return "random"
+    p = Path(name)
+    if p.is_file():                       # explicit path to a .py
+        return str(p)
+    candidate = AGENTS_DIR / name / "main.py"
+    if candidate.is_file():               # a name under agents/
+        return str(candidate)
+    agents = ", ".join(available_agents()) or "(none found)"
+    sys.exit(f"Unknown agent '{name}'. Available: {agents}, random (or pass a path to a .py file).")
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Run a Maze Crawler (crawl) match.")
-    ap.add_argument("p1", nargs="?", default=DEFAULT_AGENT,
-                    help='player 1: path to an agent .py, or "random" (default: your agent)')
-    ap.add_argument("p2", nargs="?", default="random",
-                    help='player 2: path to an agent .py, or "random" (default: random)')
+    ap = argparse.ArgumentParser(
+        description="Run a Maze Crawler (crawl) match.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Agents are names under agents/ (e.g. greedy, baseline), a path to a .py, or 'random'.",
+    )
+    ap.add_argument("p1", nargs="?", default=DEFAULT_P1, help=f"player 1 agent (default: {DEFAULT_P1})")
+    ap.add_argument("p2", nargs="?", default=DEFAULT_P2, help=f"player 2 agent (default: {DEFAULT_P2})")
+    ap.add_argument("--p1", dest="p1_opt", help="player 1 agent (overrides positional)")
+    ap.add_argument("--p2", dest="p2_opt", help="player 2 agent (overrides positional)")
     ap.add_argument("--seed", type=int, default=42, help="map/random seed (default: 42)")
     ap.add_argument("--out", default="data/crawl_replay.html", help="replay output path")
     ap.add_argument("--no-open", action="store_true", help="do not open the replay in a browser")
+    ap.add_argument("--list", action="store_true", help="list available agents and exit")
     args = ap.parse_args()
 
-    env = make("crawl", configuration={"randomSeed": args.seed}, debug=True)
-    print(f"Running: {args.p1}  vs  {args.p2}   (seed {args.seed})")
-    env.run([args.p1, args.p2])
+    if args.list:
+        print("Available agents (agents/<name>/main.py):")
+        for name in available_agents():
+            print(f"  {name}")
+        print("  random   (built-in)")
+        return
 
-    p0, p1 = env.steps[-1][0], env.steps[-1][1]
-    print(f"Result -> player_0: reward={p0['reward']} ({p0['status']}) | "
-          f"player_1: reward={p1['reward']} ({p1['status']})")
-    if p0["reward"] == p1["reward"]:
+    p1_name = args.p1_opt or args.p1
+    p2_name = args.p2_opt or args.p2
+    p1, p2 = resolve_agent(p1_name), resolve_agent(p2_name)
+
+    env = make("crawl", configuration={"randomSeed": args.seed}, debug=True)
+    print(f"Running: {p1_name}  vs  {p2_name}   (seed {args.seed})")
+    env.run([p1, p2])
+
+    s0, s1 = env.steps[-1][0], env.steps[-1][1]
+    print(f"Result -> {p1_name} (P1): reward={s0['reward']} ({s0['status']}) | "
+          f"{p2_name} (P2): reward={s1['reward']} ({s1['status']})")
+    if s0["reward"] == s1["reward"]:
         print("Outcome: draw / tie")
     else:
-        print(f"Outcome: player_{0 if p0['reward'] > p1['reward'] else 1} wins")
+        winner = p1_name if s0["reward"] > s1["reward"] else p2_name
+        print(f"Outcome: {winner} wins")
 
     out = write_viewer(env, args.out)
     print(f"\nReplay written to {out}")
